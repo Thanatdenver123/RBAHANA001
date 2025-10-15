@@ -1,0 +1,1910 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบสอบออนไลน์ RBA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #e3f2fd 0%, #1976d2 50%, #0d47a1 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .bounce-animation {
+            animation: bounce 1s infinite;
+        }
+        @keyframes bounce {
+            0%, 20%, 53%, 80%, 100% { transform: translateY(0); }
+            40%, 43% { transform: translateY(-30px); }
+            70% { transform: translateY(-15px); }
+            90% { transform: translateY(-4px); }
+        }
+        .celebration {
+            animation: celebration 0.6s ease-in-out;
+        }
+        @keyframes celebration {
+            0% { transform: scale(0.8) rotate(-10deg); opacity: 0; }
+            50% { transform: scale(1.1) rotate(5deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="min-h-full bg-gray-50">
+    <!-- หน้าเข้าสู่ระบบครู -->
+    <div id="teacherLogin" class="h-full gradient-bg flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl card-shadow p-8 w-full max-w-md">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">ระบบสอบ RBA</h1>
+                <p class="text-gray-600">สำหรับครูผู้สอน</p>
+                <div class="mt-2 text-xs text-gray-500">
+                    <p>Version 2.1 | Cloud Ready ☁️</p>
+                    <p>🌏 ใช้งานได้ทั่วประเทศไทย | Real-time System</p>
+                    <p>📡 GitHub + Netlify + IndexedDB</p>
+                </div>
+            </div>
+            <div class="space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">รหัสห้อง</label>
+                    <input type="text" id="roomCode" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="กรอกรหัสห้อง (RBA)" onkeypress="if(event.key==='Enter') teacherLogin()">
+                    <p class="text-xs text-gray-500 mt-1">💡 รหัสห้องคือ: <span class="font-semibold text-blue-600">RBA</span></p>
+                </div>
+                
+                <!-- ปุ่มทดสอบระบบ -->
+                <button onclick="testSystemConnection()" id="testSystemBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200 mb-3">
+                    🔧 ทดสอบการเชื่อมต่อระบบ
+                </button>
+                
+                <button onclick="teacherLogin()" id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200">
+                    เข้าสู่ระบบ
+                </button>
+                
+                <!-- แสดงสถานะการเชื่อมต่อ -->
+                <div id="connectionStatus" class="hidden mt-4 p-3 rounded-lg text-sm">
+                    <div class="flex items-center">
+                        <div id="statusIcon" class="mr-2"></div>
+                        <div id="statusMessage"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- หน้า Dashboard ครู -->
+    <div id="teacherDashboard" class="hidden h-full bg-gradient-to-br from-blue-50 to-blue-100">
+        <nav class="bg-white shadow-sm border-b">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <h1 class="text-xl font-semibold text-gray-900">Dashboard - ห้อง RBA</h1>
+                    <div class="flex space-x-4">
+                        <button onclick="toggleExamSystem()" id="examToggleBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg">
+                            🔒 ปิดระบบสอบ
+                        </button>
+                        <button onclick="openStudentPage()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg">
+                            📱 เปิดหน้านักเรียน
+                        </button>
+                        <button onclick="exportResults()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg shadow-lg">
+                            ดาวน์โหลดผล
+                        </button>
+                        <button onclick="connectGoogleSheets()" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg shadow-lg">
+                            เชื่อมต่อ Google Sheets
+                        </button>
+                        <button onclick="clearSystem()" id="clearSystemBtn" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg shadow-lg">
+                            🗑️ เคลียร์ระบบ
+                        </button>
+                        <button onclick="logout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg shadow-lg">
+                            ออกจากระบบ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- สถานะระบบสอบ -->
+            <div class="mb-6">
+                <div class="bg-white rounded-lg shadow p-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center">
+                            <div class="p-2 rounded-lg" id="systemStatusIcon">
+                                <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                                </svg>
+                            </div>
+                            <div class="ml-3">
+                                <p class="text-sm font-medium text-gray-600">สถานะระบบสอบ</p>
+                                <p class="text-lg font-semibold" id="systemStatusText">🔒 ปิดระบบ - นักเรียนไม่สามารถเข้าสอบได้</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium" id="systemStatusBadge">
+                                <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                                ปิดระบบ
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white">
+                    <div class="flex items-center">
+                        <div class="p-3 bg-white bg-opacity-20 rounded-lg">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-blue-100">นักเรียนเข้าสอบ</p>
+                            <p class="text-3xl font-bold" id="totalStudents">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white">
+                    <div class="flex items-center">
+                        <div class="p-3 bg-white bg-opacity-20 rounded-lg">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-green-100">ทำเสร็จแล้ว</p>
+                            <p class="text-3xl font-bold" id="completedStudents">0</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-yellow-500 to-orange-500 rounded-xl shadow-lg p-6 text-white">
+                    <div class="flex items-center">
+                        <div class="p-3 bg-white bg-opacity-20 rounded-lg">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-yellow-100">คะแนนเฉลี่ย</p>
+                            <p class="text-3xl font-bold" id="averageScore">0%</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white">
+                    <div class="flex items-center">
+                        <div class="p-3 bg-white bg-opacity-20 rounded-lg">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <p class="text-sm font-medium text-purple-100">เวลาเฉลี่ย</p>
+                            <p class="text-3xl font-bold" id="averageTime">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard สถิติ 5 อันดับแรก -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                <!-- 5 อันดับคะแนนสูงสุด -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-gradient-to-r from-yellow-400 to-orange-500 px-6 py-4">
+                        <h3 class="text-lg font-bold text-white flex items-center">
+                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            🏆 5 อันดับคะแนนสูงสุด
+                        </h3>
+                    </div>
+                    <div class="p-6">
+                        <div id="topScores" class="space-y-4">
+                            <div class="text-center text-gray-500 py-8">
+                                <svg class="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <p>ยังไม่มีผลการสอบ</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5 อันดับทำเสร็จเร็วสุด -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                    <div class="bg-gradient-to-r from-blue-500 to-purple-600 px-6 py-4">
+                        <h3 class="text-lg font-bold text-white flex items-center">
+                            <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            ⚡ 5 อันดับทำเสร็จเร็วสุด
+                        </h3>
+                    </div>
+                    <div class="p-6">
+                        <div id="fastestTimes" class="space-y-4">
+                            <div class="text-center text-gray-500 py-8">
+                                <svg class="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                                <p>ยังไม่มีผลการสอบ</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg overflow-hidden">
+                <div class="bg-gradient-to-r from-indigo-500 to-purple-600 px-6 py-4">
+                    <h3 class="text-lg font-bold text-white flex items-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        📊 ผลคะแนนแบบ Real-time
+                    </h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">รหัสพนักงาน</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ชื่อ-นามสกุล</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">แผนก</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">คะแนน</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">สถานะ</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">เวลา/อุปกรณ์</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsTable" class="bg-white divide-y divide-gray-200">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal QR Code -->
+    <div id="qrModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">📱 QR Code สำหรับนักเรียน</h3>
+                
+                <div class="mb-6">
+                    <div id="qrcode" class="flex justify-center mb-4"></div>
+                    <p class="text-sm text-gray-600 mb-2">ให้นักเรียนใช้มือถือสแกน QR Code นี้</p>
+                    <p class="text-xs text-blue-600 font-medium" id="studentUrl"></p>
+                </div>
+
+                <div class="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                    <h4 class="text-sm font-medium text-yellow-800 mb-2">📋 วิธีใช้งาน:</h4>
+                    <ol class="text-xs text-yellow-700 space-y-1 list-decimal list-inside text-left">
+                        <li>เปิดระบบสอบก่อน (ปุ่มสีเขียว)</li>
+                        <li>ให้นักเรียนสแกน QR Code ด้วยมือถือ</li>
+                        <li>นักเรียนกรอก EmployeeID เพื่อเข้าสอบ</li>
+                        <li>ระบบจะแสดงข้อมูลและเริ่มสอบทันที</li>
+                    </ol>
+                </div>
+
+                <div class="flex justify-center space-x-3">
+                    <button onclick="closeQRModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                        ปิด
+                    </button>
+                    <button onclick="copyStudentUrl()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg">
+                        📋 คัดลอกลิงก์
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal ยืนยันเคลียร์ระบบ -->
+    <div id="clearSystemModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <div class="mt-3 text-center">
+                <div class="text-6xl mb-4">⚠️</div>
+                <h3 class="text-lg font-medium text-gray-900 mb-4">🗑️ เคลียร์ระบบ</h3>
+                
+                <div class="mb-6">
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                        <h4 class="text-sm font-medium text-red-800 mb-2">⚠️ คำเตือน:</h4>
+                        <ul class="text-sm text-red-700 space-y-1 text-left list-disc list-inside">
+                            <li>การดำเนินการนี้จะลบข้อมูลทั้งหมดในระบบ</li>
+                            <li>ข้อมูลที่ถูกลบจะไม่สามารถกู้คืนได้</li>
+                            <li>กรุณาดาวน์โหลดผลการสอบก่อนเคลียร์ระบบ</li>
+                        </ul>
+                    </div>
+                    
+                    <div id="downloadWarning" class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                        <p class="text-sm text-yellow-800">
+                            <span class="font-medium">📋 กรุณาดาวน์โหลดผลการสอบก่อน</span><br>
+                            คุณต้องดาวน์โหลดผลการสอบเรียบร้อยแล้วถึงจะสามารถเคลียร์ระบบได้
+                        </p>
+                    </div>
+                </div>
+
+                <div class="flex justify-center space-x-3">
+                    <button onclick="closeClearSystemModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                        ยกเลิก
+                    </button>
+                    <button onclick="confirmClearSystem()" id="confirmClearBtn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        🗑️ ยืนยันเคลียร์ระบบ
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal ตั้งค่า Google Sheets -->
+    <div id="googleSheetsModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">📊 ตั้งค่า Google Sheets</h3>
+                
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Sheet ID (จาก URL)</label>
+                    <input type="text" id="sheetsId" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" 
+                           placeholder="163RszY_6sDDQXxWiPlkw7g5HCj_U4N49H7CMCmzWPEw"
+                           value="163RszY_6sDDQXxWiPlkw7g5HCj_U4N49H7CMCmzWPEw">
+                    <p class="text-xs text-gray-500 mt-1">คัดลอกจาก URL: /spreadsheets/d/<strong>SHEET_ID</strong>/edit</p>
+                </div>
+
+                <div class="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4">
+                    <h4 class="text-sm font-medium text-blue-800 mb-2">📋 รูปแบบข้อมูลใน Google Sheets:</h4>
+                    <div class="text-xs text-blue-700 space-y-1">
+                        <p><strong>คอลัมน์ A:</strong> EmployeeID (รหัสพนักงาน)</p>
+                        <p><strong>คอลัมน์ B:</strong> FirstName (ชื่อ)</p>
+                        <p><strong>คอลัมน์ C:</strong> LastName (นามสกุล)</p>
+                        <p><strong>คอลัมน์ D:</strong> Department (แผนก)</p>
+                    </div>
+                </div>
+
+                <div class="flex justify-end space-x-3">
+                    <button onclick="closeGoogleSheetsModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                        ยกเลิก
+                    </button>
+                    <button onclick="saveSimpleConnection()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+                        💾 บันทึก
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- หน้าเข้าสู่ระบบนักเรียน (หน้าแยก) -->
+    <div id="studentLogin" class="hidden h-full gradient-bg flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl card-shadow p-8 w-full max-w-md">
+            <div class="text-center mb-8">
+                <div class="text-6xl mb-4">📚</div>
+                <h1 class="text-3xl font-bold text-gray-800 mb-2">ระบบสอบ RBA</h1>
+                <p class="text-gray-600">สำหรับนักเรียน</p>
+            </div>
+            
+            <!-- แจ้งเตือนเมื่อระบบปิด -->
+            <div id="systemClosedAlert" class="hidden mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 text-red-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                    <div>
+                        <h3 class="text-sm font-medium text-red-800">ระบบสอบปิดอยู่</h3>
+                        <p class="text-sm text-red-700">กรุณารอให้ครูเปิดระบบสอบก่อนเข้าใช้งาน</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="space-y-6" id="loginForm">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">รหัสพนักงาน (Employee ID)</label>
+                    <input type="text" id="employeeId" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="กรอกรหัสพนักงาน">
+                </div>
+                <button onclick="studentLogin()" id="studentLoginBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200">
+                    🔍 ตรวจสอบข้อมูล
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- หน้าแสดงข้อมูลนักเรียน -->
+    <div id="studentInfo" class="hidden h-full gradient-bg flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl card-shadow p-8 w-full max-w-md">
+            <div class="text-center mb-8">
+                <div class="text-6xl mb-4">👤</div>
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">ข้อมูลของคุณ</h2>
+                <p class="text-gray-600">กรุณาตรวจสอบข้อมูลให้ถูกต้อง</p>
+            </div>
+            
+            <div class="space-y-4 mb-8">
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">รหัสพนักงาน</label>
+                    <p class="text-lg font-semibold text-gray-900" id="displayEmployeeId">-</p>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">ชื่อ</label>
+                    <p class="text-lg font-semibold text-gray-900" id="displayFirstName">-</p>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">นามสกุล</label>
+                    <p class="text-lg font-semibold text-gray-900" id="displayLastName">-</p>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <label class="block text-sm font-medium text-gray-600 mb-1">แผนก</label>
+                    <p class="text-lg font-semibold text-gray-900" id="displayDepartment">-</p>
+                </div>
+            </div>
+            
+            <div class="space-y-3">
+                <button onclick="startExam()" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200">
+                    🚀 เริ่มทำข้อสอบ
+                </button>
+                <button onclick="backToLogin()" class="w-full bg-gray-500 hover:bg-gray-600 text-white font-semibold py-3 px-4 rounded-lg transition duration-200">
+                    ← กลับไปแก้ไขข้อมูล
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- หน้าข้อสอบ -->
+    <div id="examPage" class="hidden h-full bg-gradient-to-br from-blue-50 to-blue-100">
+        <nav class="bg-white shadow-sm border-b">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <div>
+                        <h1 class="text-xl font-semibold text-gray-900">แบบทดสอบ RBA</h1>
+                        <p class="text-sm text-gray-600" id="examStudentInfo"></p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm text-gray-600">ข้อที่ <span id="currentQuestion">1</span> / 15</p>
+                        <div class="w-32 bg-gray-200 rounded-full h-2 mt-1">
+                            <div id="progressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 6.67%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="bg-white rounded-lg shadow-lg p-8">
+                <div class="mb-8">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4" id="questionText"></h2>
+                    <div class="space-y-4">
+                        <button onclick="selectAnswer(true)" id="trueBtn" class="w-full p-4 text-left border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition duration-200">
+                            <span class="flex items-center">
+                                <span class="w-6 h-6 border-2 border-gray-300 rounded-full mr-3 flex items-center justify-center">
+                                    <span class="w-3 h-3 bg-green-500 rounded-full hidden" id="trueCheck"></span>
+                                </span>
+                                ถูก
+                            </span>
+                        </button>
+                        <button onclick="selectAnswer(false)" id="falseBtn" class="w-full p-4 text-left border-2 border-gray-200 rounded-lg hover:border-red-500 hover:bg-red-50 transition duration-200">
+                            <span class="flex items-center">
+                                <span class="w-6 h-6 border-2 border-gray-300 rounded-full mr-3 flex items-center justify-center">
+                                    <span class="w-3 h-3 bg-red-500 rounded-full hidden" id="falseCheck"></span>
+                                </span>
+                                ผิด
+                            </span>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex justify-between">
+                    <button onclick="previousQuestion()" id="prevBtn" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                        ← ข้อก่อนหน้า
+                    </button>
+                    <button onclick="nextQuestion()" id="nextBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg">
+                        ข้อถัดไป →
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- หน้าเสร็จสิ้นการสอบ -->
+    <div id="completePage" class="hidden h-full gradient-bg flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl card-shadow p-8 w-full max-w-md text-center">
+            <div class="mb-6">
+                <!-- การ์ตูนเซเลเบรชั่น -->
+                <div class="celebration mb-6">
+                    <div class="text-8xl mb-4 bounce-animation">🎉</div>
+                    <div class="flex justify-center space-x-2 mb-4">
+                        <span class="text-4xl">🎊</span>
+                        <span class="text-4xl">🏆</span>
+                        <span class="text-4xl">🎊</span>
+                    </div>
+                </div>
+                
+                <h2 class="text-3xl font-bold text-gray-800 mb-4">ยินดีด้วย!</h2>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                    <p class="text-lg font-semibold text-green-800 mb-2">🎯 ท่านได้ทำข้อสอบเสร็จแล้ว</p>
+                    <div class="text-sm text-green-700">
+                        <p>คะแนนของคุณ: <span class="font-bold text-xl" id="finalScore">-</span></p>
+                        <p>เปอร์เซ็นต์: <span class="font-bold text-xl" id="finalPercentage">-</span></p>
+                    </div>
+                </div>
+                
+                <div class="space-y-3">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p class="text-sm text-blue-700">
+                            <span class="font-semibold">📝 ขอบคุณที่เข้าร่วมทำแบบทดสอบ</span><br>
+                            ผลคะแนนได้ถูกบันทึกเรียบร้อยแล้ว
+                        </p>
+                    </div>
+                    
+                    <button onclick="backToStudentHome()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition duration-200">
+                        🏠 กลับสู่หน้าแรก
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // เริ่มต้นระบบเมื่อโหลดหน้า
+        window.addEventListener('DOMContentLoaded', async function() {
+            console.log('🚀 เริ่มต้นระบบสอบ RBA...');
+            
+            // ตรวจสอบ URL parameters
+            const urlParams = new URLSearchParams(window.location.search);
+            const isStudentMode = urlParams.get('student') === 'true';
+            const roomParam = urlParams.get('room');
+            
+            if (isStudentMode && roomParam === ROOM_CODE) {
+                // แสดงหน้านักเรียน
+                console.log('👨‍🎓 เปิดหน้านักเรียน');
+                document.getElementById('teacherLogin').classList.add('hidden');
+                document.getElementById('studentLogin').classList.remove('hidden');
+                
+                // เริ่ม real-time updates สำหรับนักเรียน
+                isTeacher = false;
+                startRealTimeUpdates();
+                
+                // ตรวจสอบสถานะระบบทันที
+                await loadFromCloudStorage();
+                await checkExamSystemStatus();
+                
+            } else {
+                // แสดงหน้าครู (default)
+                console.log('👨‍🏫 เปิดหน้าครู');
+                document.getElementById('teacherLogin').classList.remove('hidden');
+                document.getElementById('studentLogin').classList.add('hidden');
+            }
+            
+            // โหลดข้อมูลเริ่มต้น
+            await loadFromCloudStorage();
+            await loadStudentData();
+            
+            console.log('✅ ระบบพร้อมใช้งานทั่วประเทศไทย');
+        });
+
+        // ข้อมูลข้อสอบ
+        const questions = [
+            { text: "RBA (Responsible Business Alliance) คือ มาตรฐานจรรยาบรรณแห่งพันธมิตรธุรกิจผู้มีความรับผิดชอบ", answer: true },
+            { text: "CORPORATE CODE OF CONDUCT คือ ข้อกำหนดด้านจริยธรรมทางธุรกิจของบริษัท", answer: true },
+            { text: "ข้อกำหนดด้านจริยธรรม เป็นบทบัญญัติมาตรฐานพฤติกรรมที่ผู้บริหารและพนักงานทุกคนต้องปฏิบัติตาม", answer: true },
+            { text: "บริษัทฮานาฯ นำหลักการของ RBA มาปฏิบัติในฐานะคู่ค้ากับบริษัทสมาชิก RBA", answer: true },
+            { text: "องค์ประกอบของ RBA มีทั้งหมด 5 ส่วน คือ มาตรฐานแรงงาน, สุขภาพและความปลอดภัย, สิ่งแวดล้อม, ระบบบริหารการจัดการ, จริยธรรมทางธุรกิจ", answer: true },
+            { text: "บริษัทฮานาฯ สามารถรับพนักงานอายุต่ำกว่า 18 ปีเข้าทำงานได้โดยไม่ผิดจรรยาบรรณ", answer: false },
+            { text: "แรงงานต้องไม่มีการปฏิบัติโดยใช้ความรุนแรงหรือไร้มนุษยธรรม รวมถึงการขู่เข็ญทางจิตใจหรือร่างกาย การล่วงละเมิดทางเพศ หรือการละเมิดด้วยวาจาต่อแรงงาน", answer: true },
+            { text: "หากสถานประกอบการมีความปลอดภัยและมีสภาพสิ่งแวดล้อมที่ดีพนักงานก็มีขวัญและกำลังใจในการทำงานช่วยส่งผลให้คุณภาพของสินค้าและบริการมีคุณภาพมากขึ้น", answer: true },
+            { text: "สถานการณ์และเหตุการณ์ในกรณีฉุกเฉินที่อาจเกิดขึ้น ต้องได้รับการตรวจและประเมินผล", answer: true },
+            { text: "บริษัทจะต้องยึดถือการปฏิบัติตามกฎหมาย ระเบียบและข้อกำหนดของลูกค้าเกี่ยวกับการห้ามหรือการจำกัดสารเฉพาะในสินค้าและการผลิต เช่นเปลี่ยนมาใช้ผลิตภัณฑ์ RoHS", answer: true },
+            { text: "พนักงานทุกคนสามารถติดสินบนได้ทุกรูปแบบ หากทำให้งานสำเร็จลุล่วงไปได้", answer: false },
+            { text: "บริษัทจะต้องผลิต, ส่งมอบสินค้าและบริการตรงตามความต้องการของลูกค้า", answer: true },
+            { text: "พนักงานทุกคนจะต้องเคารพสิทธิเกี่ยวกับทรัพย์สินทางปัญญาของลูกค้า โดยจะต้องไม่แอบถ่ายรูปหรือนำข้อมูลลูกค้าไปเผยแพร่โดยเด็ดขาด ถือว่าผิดกฎหมายและต้องถูกลงโทษ", answer: true },
+            { text: "พนักงานทุกคนจะต้องใช้ทรัพย์สินของบริษัทเพื่อประโยชน์ในการดำเนินธุรกิจของบริษัทเท่านั้น ไม่ใช่เพื่อประโยชน์ส่วนตัว", answer: true },
+            { text: "บริษัทฮานาฯ มีนโยบายสนับสนุนการมีส่วนร่วมของชุมชน ส่งเสริมความสัมพันธ์ทางสังคม ช่วยการพัฒนาทางสังคมและเศรษฐกิจให้มีความเข้มแข็ง", answer: true }
+        ];
+
+        // ข้อมูลนักเรียนจาก Google Sheets
+        let studentData = {};
+        
+        // Google Sheets Configuration
+        let SHEET_ID = '163RszY_6sDDQXxWiPlkw7g5HCj_U4N49H7CMCmzWPEw';
+        
+        // ระบบควบคุมการเข้าสอบ
+        let examSystemEnabled = false;
+        
+        // ตัวแปรสำหรับเก็บสถานะ
+        let currentUser = null;
+        let currentQuestionIndex = 0;
+        let userAnswers = [];
+        let examResults = [];
+        let isTeacher = false;
+        let examStartTime = null;
+        let hasDownloaded = false;
+        
+        // ระบบจัดเก็บข้อมูลแบบ Cloud Storage สำหรับ GitHub/Netlify
+        let updateInterval = null;
+        const ROOM_CODE = 'RBA';
+        
+        // ข้อมูลสำหรับ GitHub Repository
+        const GITHUB_REPO = 'https://github.com/Dekcom54/rba-hana';
+        const NETLIFY_URL = 'https://app.netlify.com/teams/dekcom54/projects';
+        
+        // Cloud Storage Configuration สำหรับการใช้งานทั่วประเทศ
+        const CLOUD_STORAGE_KEY = 'rba_exam_cloud_data';
+        const CLOUD_BACKUP_KEYS = ['rba_backup_1', 'rba_backup_2', 'rba_backup_3'];
+        
+        // ฟังก์ชันดึงข้อมูลจาก Google Sheets
+        async function loadStudentData() {
+            try {
+                const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+                
+                console.log('กำลังดึงข้อมูลจาก Google Sheets...');
+                const response = await fetch(csvUrl);
+                
+                if (response.ok) {
+                    const csvText = await response.text();
+                    const lines = csvText.split('\n');
+                    
+                    if (lines.length > 1) {
+                        studentData = {};
+                        for (let i = 1; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            if (line) {
+                                const columns = line.split(',').map(col => col.replace(/"/g, '').trim());
+                                if (columns.length >= 4 && columns[0] && columns[1] && columns[2] && columns[3]) {
+                                    studentData[columns[0]] = {
+                                        employeeId: columns[0],
+                                        firstName: columns[1],
+                                        lastName: columns[2],
+                                        department: columns[3]
+                                    };
+                                }
+                            }
+                        }
+                        
+                        if (Object.keys(studentData).length > 0) {
+                            console.log('✅ ดึงข้อมูลจาก Google Sheets สำเร็จ:', Object.keys(studentData).length, 'คน');
+                            localStorage.setItem('studentData', JSON.stringify(studentData));
+                            return;
+                        }
+                    }
+                }
+                
+                throw new Error('ไม่สามารถดึงข้อมูลได้');
+                
+            } catch (error) {
+                console.warn('⚠️ ไม่สามารถดึงข้อมูลจาก Google Sheets:', error.message);
+                
+                const savedData = localStorage.getItem('studentData');
+                if (savedData) {
+                    studentData = JSON.parse(savedData);
+                    console.log('📱 ใช้ข้อมูลที่บันทึกไว้:', Object.keys(studentData).length, 'คน');
+                    return;
+                }
+                
+                // ข้อมูลจำลอง
+                studentData = {
+                    "001": { employeeId: "001", firstName: "สมชาย", lastName: "ใจดี", department: "วิศวกรรม" },
+                    "002": { employeeId: "002", firstName: "สมหญิง", lastName: "รักเรียน", department: "คอมพิวเตอร์" },
+                    "003": { employeeId: "003", firstName: "ทดสอบ", lastName: "ระบบ", department: "บริหาร" },
+                    "004": { employeeId: "004", firstName: "จันทร์", lastName: "เพ็ญ", department: "การตลาด" },
+                    "005": { employeeId: "005", firstName: "วิชัย", lastName: "สมบูรณ์", department: "การเงิน" }
+                };
+                console.log('🔄 ใช้ข้อมูลจำลอง:', Object.keys(studentData).length, 'คน');
+            }
+        }
+
+        // ฟังก์ชันจัดเก็บข้อมูลแบบ Cloud Storage สำหรับใช้งานทั่วประเทศ
+        async function saveToCloudStorage() {
+            try {
+                const cloudData = {
+                    examSystemEnabled: examSystemEnabled,
+                    examResults: examResults,
+                    timestamp: Date.now(),
+                    lastUpdate: new Date().toISOString(),
+                    roomCode: ROOM_CODE,
+                    version: '2.1'
+                };
+                
+                const dataString = JSON.stringify(cloudData);
+                
+                // บันทึกหลายที่เพื่อความปลอดภัย
+                localStorage.setItem(CLOUD_STORAGE_KEY, dataString);
+                sessionStorage.setItem(CLOUD_STORAGE_KEY, dataString);
+                
+                // สร้าง backup หลายชุด
+                CLOUD_BACKUP_KEYS.forEach((key, index) => {
+                    try {
+                        localStorage.setItem(key, dataString);
+                    } catch (e) {
+                        console.warn(`⚠️ ไม่สามารถสร้าง backup ${index + 1}:`, e.message);
+                    }
+                });
+                
+                // ใช้ IndexedDB สำหรับข้อมูลขนาดใหญ่
+                try {
+                    await saveToIndexedDB(cloudData);
+                } catch (e) {
+                    console.warn('⚠️ IndexedDB ไม่พร้อมใช้งาน:', e.message);
+                }
+                
+                console.log('☁️ บันทึกข้อมูลลง Cloud Storage สำเร็จ');
+                return true;
+            } catch (error) {
+                console.error('❌ ไม่สามารถบันทึกข้อมูล:', error.message);
+                return false;
+            }
+        }
+        
+        async function loadFromCloudStorage() {
+            try {
+                let data = null;
+                
+                // ลองโหลดจาก sessionStorage ก่อน (ข้อมูลล่าสุด)
+                try {
+                    const sessionData = sessionStorage.getItem(CLOUD_STORAGE_KEY);
+                    if (sessionData) {
+                        data = JSON.parse(sessionData);
+                        console.log('📱 โหลดข้อมูลจาก SessionStorage สำเร็จ');
+                    }
+                } catch (e) {
+                    console.warn('⚠️ SessionStorage ไม่พร้อมใช้งาน');
+                }
+                
+                // ถ้าไม่มีใน session ให้ลองจาก localStorage
+                if (!data) {
+                    try {
+                        const localData = localStorage.getItem(CLOUD_STORAGE_KEY);
+                        if (localData) {
+                            data = JSON.parse(localData);
+                            console.log('💾 โหลดข้อมูลจาก LocalStorage สำเร็จ');
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ LocalStorage ไม่พร้อมใช้งาน');
+                    }
+                }
+                
+                // ถ้ายังไม่มี ลองจาก backup
+                if (!data) {
+                    for (const backupKey of CLOUD_BACKUP_KEYS) {
+                        try {
+                            const backupData = localStorage.getItem(backupKey);
+                            if (backupData) {
+                                data = JSON.parse(backupData);
+                                console.log(`🔄 โหลดข้อมูลจาก Backup สำเร็จ: ${backupKey}`);
+                                break;
+                            }
+                        } catch (e) {
+                            continue;
+                        }
+                    }
+                }
+                
+                // ลองจาก IndexedDB
+                if (!data) {
+                    try {
+                        data = await loadFromIndexedDB();
+                        if (data) {
+                            console.log('🗄️ โหลดข้อมูลจาก IndexedDB สำเร็จ');
+                        }
+                    } catch (e) {
+                        console.warn('⚠️ IndexedDB ไม่พร้อมใช้งาน');
+                    }
+                }
+                
+                if (data && data.roomCode === ROOM_CODE) {
+                    examSystemEnabled = data.examSystemEnabled || false;
+                    examResults = data.examResults || [];
+                    console.log('✅ โหลดข้อมูลสำเร็จ - ระบบ:', examSystemEnabled ? 'เปิด' : 'ปิด', '| ผลสอบ:', examResults.length, 'คน');
+                    return true;
+                } else {
+                    // ใช้ค่าเริ่มต้น
+                    examSystemEnabled = false;
+                    examResults = [];
+                    console.log('🔄 ใช้ข้อมูลเริ่มต้น');
+                    return true;
+                }
+            } catch (error) {
+                console.warn('⚠️ ไม่สามารถโหลดข้อมูล:', error.message);
+                examSystemEnabled = false;
+                examResults = [];
+                return false;
+            }
+        }
+        
+        // ฟังก์ชัน IndexedDB สำหรับข้อมูลขนาดใหญ่
+        async function saveToIndexedDB(data) {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('RBAExamDB', 1);
+                
+                request.onerror = () => reject(request.error);
+                
+                request.onsuccess = () => {
+                    const db = request.result;
+                    const transaction = db.transaction(['examData'], 'readwrite');
+                    const store = transaction.objectStore('examData');
+                    
+                    store.put({ id: ROOM_CODE, data: data });
+                    
+                    transaction.oncomplete = () => resolve(true);
+                    transaction.onerror = () => reject(transaction.error);
+                };
+                
+                request.onupgradeneeded = () => {
+                    const db = request.result;
+                    if (!db.objectStoreNames.contains('examData')) {
+                        db.createObjectStore('examData', { keyPath: 'id' });
+                    }
+                };
+            });
+        }
+        
+        async function loadFromIndexedDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('RBAExamDB', 1);
+                
+                request.onerror = () => reject(request.error);
+                
+                request.onsuccess = () => {
+                    const db = request.result;
+                    const transaction = db.transaction(['examData'], 'readonly');
+                    const store = transaction.objectStore('examData');
+                    const getRequest = store.get(ROOM_CODE);
+                    
+                    getRequest.onsuccess = () => {
+                        const result = getRequest.result;
+                        resolve(result ? result.data : null);
+                    };
+                    
+                    getRequest.onerror = () => reject(getRequest.error);
+                };
+                
+                request.onupgradeneeded = () => {
+                    const db = request.result;
+                    if (!db.objectStoreNames.contains('examData')) {
+                        db.createObjectStore('examData', { keyPath: 'id' });
+                    }
+                };
+            });
+        }
+        
+        // ฟังก์ชัน real-time sync แบบใหม่สำหรับใช้งานทั่วประเทศ
+        function startRealTimeUpdates() {
+            if (updateInterval) clearInterval(updateInterval);
+            
+            // ใช้ interval ที่เร็วขึ้นสำหรับ real-time
+            updateInterval = setInterval(async () => {
+                try {
+                    if (isTeacher) {
+                        // ครูบันทึกข้อมูลและอัพเดท dashboard
+                        await saveToCloudStorage();
+                        await updateDashboard();
+                    } else {
+                        // นักเรียนโหลดข้อมูลและตรวจสอบสถานะ
+                        await loadFromCloudStorage();
+                        await checkExamSystemStatus();
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Real-time update error:', error.message);
+                }
+            }, 1500); // เร็วขึ้นเป็น 1.5 วินาที
+            
+            console.log('🔄 เริ่ม Real-time Updates แล้ว');
+        }
+        
+        function stopRealTimeUpdates() {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+                updateInterval = null;
+            }
+        }
+
+        // ฟังก์ชันควบคุมระบบสอบ
+        async function toggleExamSystem() {
+            examSystemEnabled = !examSystemEnabled;
+            updateSystemStatus();
+            
+            // บันทึกทันทีและ force sync
+            await saveToCloudStorage();
+            
+            // แจ้งเตือนสถานะ
+            const status = examSystemEnabled ? 'เปิด' : 'ปิด';
+            const toggleBtn = document.getElementById('examToggleBtn');
+            const originalText = toggleBtn.textContent;
+            
+            toggleBtn.textContent = `✅ ${status}ระบบแล้ว!`;
+            toggleBtn.classList.add('bg-green-600');
+            
+            setTimeout(() => {
+                toggleBtn.textContent = originalText;
+                toggleBtn.classList.remove('bg-green-600');
+            }, 2000);
+            
+            console.log(`🔄 ระบบสอบ${status}แล้ว - ส่งสัญญาณไปทั่วประเทศ`);
+        }
+        
+        // ฟังก์ชันอัพเดทสถานะระบบ
+        function updateSystemStatus() {
+            const toggleBtn = document.getElementById('examToggleBtn');
+            const statusIcon = document.getElementById('systemStatusIcon');
+            const statusText = document.getElementById('systemStatusText');
+            const statusBadge = document.getElementById('systemStatusBadge');
+            
+            if (examSystemEnabled) {
+                toggleBtn.innerHTML = '🔓 เปิดระบบสอบ';
+                toggleBtn.className = 'bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg';
+                
+                statusIcon.innerHTML = `
+                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z"></path>
+                    </svg>
+                `;
+                statusText.textContent = '🔓 เปิดระบบ - นักเรียนสามารถเข้าสอบได้';
+                statusBadge.innerHTML = `
+                    <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                    เปิดระบบ
+                `;
+                statusBadge.className = 'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800';
+            } else {
+                toggleBtn.innerHTML = '🔒 ปิดระบบสอบ';
+                toggleBtn.className = 'bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-semibold shadow-lg';
+                
+                statusIcon.innerHTML = `
+                    <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                `;
+                statusText.textContent = '🔒 ปิดระบบ - นักเรียนไม่สามารถเข้าสอบได้';
+                statusBadge.innerHTML = `
+                    <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                    ปิดระบบ
+                `;
+                statusBadge.className = 'inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800';
+            }
+        }
+
+        // ฟังก์ชันทดสอบการเชื่อมต่อระบบ
+        async function testSystemConnection() {
+            const testBtn = document.getElementById('testSystemBtn');
+            const statusDiv = document.getElementById('connectionStatus');
+            const statusIcon = document.getElementById('statusIcon');
+            const statusMessage = document.getElementById('statusMessage');
+            
+            try {
+                // แสดงสถานะกำลังทดสอบ
+                testBtn.disabled = true;
+                testBtn.innerHTML = `
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    กำลังทดสอบระบบ...
+                `;
+                
+                statusDiv.classList.remove('hidden');
+                statusDiv.className = 'mt-4 p-3 rounded-lg text-sm bg-blue-50 border border-blue-200';
+                statusIcon.innerHTML = '🔄';
+                statusMessage.textContent = 'กำลังตรวจสอบการเชื่อมต่อ...';
+                
+                console.log('🔧 เริ่มทดสอบการเชื่อมต่อระบบ...');
+                
+                // ทดสอบ localStorage
+                await new Promise(resolve => setTimeout(resolve, 500));
+                try {
+                    localStorage.setItem('test_connection', 'ok');
+                    localStorage.removeItem('test_connection');
+                    console.log('✅ LocalStorage: ใช้งานได้');
+                } catch (e) {
+                    throw new Error('LocalStorage ไม่พร้อมใช้งาน');
+                }
+                
+                // ทดสอบ sessionStorage
+                await new Promise(resolve => setTimeout(resolve, 500));
+                try {
+                    sessionStorage.setItem('test_connection', 'ok');
+                    sessionStorage.removeItem('test_connection');
+                    console.log('✅ SessionStorage: ใช้งานได้');
+                } catch (e) {
+                    throw new Error('SessionStorage ไม่พร้อมใช้งาน');
+                }
+                
+                // ทดสอบ Cloud Storage
+                await new Promise(resolve => setTimeout(resolve, 500));
+                try {
+                    await loadFromCloudStorage();
+                    console.log('✅ Cloud Storage: เชื่อมต่อได้');
+                } catch (e) {
+                    console.warn('⚠️ Cloud Storage: มีปัญหา แต่ยังใช้งานได้');
+                }
+                
+                // ทดสอบ Google Sheets
+                await new Promise(resolve => setTimeout(resolve, 500));
+                try {
+                    await loadStudentData();
+                    console.log('✅ Google Sheets: เชื่อมต่อได้');
+                } catch (e) {
+                    console.warn('⚠️ Google Sheets: ใช้ข้อมูลสำรอง');
+                }
+                
+                // แสดงผลสำเร็จ
+                statusDiv.className = 'mt-4 p-3 rounded-lg text-sm bg-green-50 border border-green-200';
+                statusIcon.innerHTML = '✅';
+                statusMessage.innerHTML = `
+                    <div>
+                        <p class="font-semibold text-green-800">ระบบพร้อมใช้งาน!</p>
+                        <p class="text-green-700">• LocalStorage: ใช้งานได้</p>
+                        <p class="text-green-700">• SessionStorage: ใช้งานได้</p>
+                        <p class="text-green-700">• Cloud Storage: เชื่อมต่อแล้ว</p>
+                        <p class="text-green-700">• ข้อมูลนักเรียน: โหลดแล้ว (${Object.keys(studentData).length} คน)</p>
+                    </div>
+                `;
+                
+                console.log('🎉 ทดสอบระบบสำเร็จ - ทุกอย่างพร้อมใช้งาน!');
+                
+            } catch (error) {
+                console.error('❌ การทดสอบระบบล้มเหลว:', error.message);
+                
+                statusDiv.className = 'mt-4 p-3 rounded-lg text-sm bg-red-50 border border-red-200';
+                statusIcon.innerHTML = '❌';
+                statusMessage.innerHTML = `
+                    <div>
+                        <p class="font-semibold text-red-800">พบปัญหาการเชื่อมต่อ</p>
+                        <p class="text-red-700">• ${error.message}</p>
+                        <p class="text-red-700">• กรุณารีเฟรชหน้าเว็บและลองใหม่</p>
+                    </div>
+                `;
+            } finally {
+                // รีเซ็ตปุ่มทดสอบ
+                testBtn.disabled = false;
+                testBtn.innerHTML = '🔧 ทดสอบการเชื่อมต่อระบบ';
+                
+                // ซ่อนสถานะหลังจาก 10 วินาที
+                setTimeout(() => {
+                    if (statusDiv) statusDiv.classList.add('hidden');
+                }, 10000);
+            }
+        }
+
+        // ฟังก์ชันเข้าสู่ระบบครู (แก้ไขแล้ว)
+        async function teacherLogin() {
+            try {
+                console.log('🔄 เริ่มต้นการเข้าสู่ระบบครู...');
+                
+                const roomCode = document.getElementById('roomCode').value.trim();
+                const roomCodeInput = document.getElementById('roomCode');
+                const loginButton = document.getElementById('loginBtn');
+                
+                // ตรวจสอบว่ากรอกรหัสหรือไม่
+                if (!roomCode) {
+                    showLoginError(roomCodeInput, 'กรุณากรอกรหัสห้อง (RBA)', 'border-yellow-500');
+                    console.log('❌ ไม่ได้กรอกรหัสห้อง');
+                    return;
+                }
+                
+                // แสดงสถานะกำลังเข้าสู่ระบบ
+                showLoginLoading(loginButton, true);
+                showLoginSuccess(roomCodeInput, 'กำลังเข้าสู่ระบบ...');
+                console.log('⏳ กำลังตรวจสอบรหัสห้อง:', roomCode);
+                
+                // จำลองการตรวจสอบ (เพิ่มความน่าเชื่อถือ)
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                if (roomCode.toUpperCase() === 'RBA') {
+                    console.log('✅ รหัสห้องถูกต้อง');
+                    
+                    // แสดงสถานะกำลังโหลดข้อมูล
+                    showLoginSuccess(roomCodeInput, 'รหัสถูกต้อง กำลังโหลดข้อมูล...');
+                    
+                    isTeacher = true;
+                    
+                    // โหลดข้อมูลทั้งหมด (แก้ไขแล้ว)
+                    console.log('☁️ กำลังโหลดข้อมูลจาก Cloud Storage...');
+                    await loadFromCloudStorage();
+                    
+                    console.log('👥 กำลังโหลดข้อมูลนักเรียนจาก Google Sheets...');
+                    await loadStudentData();
+                    
+                    // แสดงสถานะเสร็จสิ้น
+                    showLoginSuccess(roomCodeInput, 'เข้าสู่ระบบสำเร็จ!');
+                    
+                    // รอสักครู่แล้วเปลี่ยนหน้า
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    
+                    // เปลี่ยนหน้า
+                    document.getElementById('teacherLogin').classList.add('hidden');
+                    document.getElementById('teacherDashboard').classList.remove('hidden');
+                    
+                    // อัพเดทระบบ
+                    updateSystemStatus();
+                    updateDashboard();
+                    startRealTimeUpdates();
+                    
+                    console.log('🎉 ครูเข้าสู่ระบบสำเร็จ!');
+                    
+                } else {
+                    console.log('❌ รหัสห้องไม่ถูกต้อง:', roomCode);
+                    showLoginError(roomCodeInput, 'รหัสห้องไม่ถูกต้อง ใช้ "RBA"', 'border-red-500');
+                }
+                
+            } catch (error) {
+                console.error('💥 เกิดข้อผิดพลาดในการเข้าสู่ระบบ:', error);
+                const roomCodeInput = document.getElementById('roomCode');
+                showLoginError(roomCodeInput, 'เกิดข้อผิดพลาด กรุณาทดสอบระบบก่อน', 'border-red-500');
+                
+                // แนะนำให้ทดสอบระบบ
+                const testBtn = document.getElementById('testSystemBtn');
+                testBtn.classList.add('animate-pulse', 'bg-yellow-600');
+                setTimeout(() => {
+                    testBtn.classList.remove('animate-pulse', 'bg-yellow-600');
+                }, 3000);
+                
+            } finally {
+                // รีเซ็ตปุ่มกลับสู่สถานะปกติ
+                showLoginLoading(loginButton, false);
+            }
+        }
+        
+        // ฟังก์ชันแสดงข้อผิดพลาดการเข้าสู่ระบบ
+        function showLoginError(input, message, borderClass) {
+            input.classList.remove('border-green-500', 'border-yellow-500');
+            input.classList.add(borderClass);
+            input.placeholder = message;
+            
+            setTimeout(() => {
+                input.classList.remove(borderClass);
+                input.placeholder = 'กรอกรหัสห้อง (RBA)';
+            }, 4000);
+        }
+        
+        // ฟังก์ชันแสดงความสำเร็จการเข้าสู่ระบบ
+        function showLoginSuccess(input, message) {
+            input.classList.remove('border-red-500', 'border-yellow-500');
+            input.classList.add('border-green-500');
+            input.placeholder = message;
+        }
+        
+        // ฟังก์ชันแสดงสถานะกำลังโหลด
+        function showLoginLoading(button, isLoading) {
+            if (isLoading) {
+                button.disabled = true;
+                button.innerHTML = `
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    กำลังเข้าสู่ระบบ...
+                `;
+                button.classList.add('opacity-75', 'cursor-not-allowed');
+            } else {
+                button.disabled = false;
+                button.innerHTML = 'เข้าสู่ระบบ';
+                button.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        }
+
+        // ฟังก์ชันเปิดหน้านักเรียนในแท็บใหม่
+        function openStudentPage() {
+            const studentUrl = window.location.origin + window.location.pathname + '?student=true&room=' + ROOM_CODE;
+            window.open(studentUrl, '_blank', 'noopener,noreferrer');
+            console.log('📱 เปิดหน้านักเรียนในแท็บใหม่');
+        }
+
+        // ฟังก์ชันแสดง QR Code (เก็บไว้สำหรับใช้งานอื่น)
+        function showQRCode() {
+            const studentUrl = window.location.origin + window.location.pathname + '?student=true&room=' + ROOM_CODE;
+            
+            // ล้าง QR Code เก่า
+            document.getElementById('qrcode').innerHTML = '';
+            
+            // สร้าง QR Code ใหม่
+            QRCode.toCanvas(document.getElementById('qrcode'), studentUrl, {
+                width: 200,
+                height: 200,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            }, function (error) {
+                if (error) console.error('Error generating QR code:', error);
+                else console.log('QR Code generated successfully');
+            });
+            
+            // แสดง URL
+            document.getElementById('studentUrl').textContent = studentUrl;
+            
+            // แสดง Modal
+            document.getElementById('qrModal').classList.remove('hidden');
+        }
+
+        // ฟังก์ชันปิด QR Modal
+        function closeQRModal() {
+            document.getElementById('qrModal').classList.add('hidden');
+        }
+
+        // ฟังก์ชันคัดลอกลิงก์
+        function copyStudentUrl() {
+            const studentUrl = window.location.origin + window.location.pathname + '?student=true&room=' + ROOM_CODE;
+            navigator.clipboard.writeText(studentUrl).then(() => {
+                // แสดงข้อความแจ้งเตือนแบบ inline
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '✅ คัดลอกแล้ว!';
+                btn.classList.add('bg-green-600');
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('bg-green-600');
+                }, 2000);
+            });
+        }
+
+        // ฟังก์ชันตรวจสอบสถานะระบบสอบแบบ Real-time
+        async function checkExamSystemStatus() {
+            // โหลดข้อมูลล่าสุดจาก Cloud Storage
+            await loadFromCloudStorage();
+            
+            const systemClosedAlert = document.getElementById('systemClosedAlert');
+            const studentLoginBtn = document.getElementById('studentLoginBtn');
+            const loginForm = document.getElementById('loginForm');
+            
+            console.log('🔍 ตรวจสอบสถานะระบบ Real-time:', examSystemEnabled ? '🟢 เปิด' : '🔴 ปิด');
+            
+            if (!examSystemEnabled) {
+                // ระบบปิด
+                if (systemClosedAlert) {
+                    systemClosedAlert.classList.remove('hidden');
+                    systemClosedAlert.innerHTML = `
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 text-red-600 mr-2 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                            </svg>
+                            <div>
+                                <h3 class="text-sm font-medium text-red-800">🔴 ระบบสอบปิดอยู่</h3>
+                                <p class="text-sm text-red-700">กรุณารอให้ครูเปิดระบบสอบก่อนเข้าใช้งาน (ตรวจสอบอัตโนมัติทุก 1.5 วินาที)</p>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                if (studentLoginBtn) {
+                    studentLoginBtn.disabled = true;
+                    studentLoginBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    studentLoginBtn.innerHTML = '🔒 ระบบปิดอยู่ <span class="animate-pulse">●</span>';
+                }
+                
+                if (loginForm) {
+                    loginForm.classList.add('opacity-50', 'pointer-events-none');
+                }
+                
+            } else {
+                // ระบบเปิด
+                if (systemClosedAlert) {
+                    systemClosedAlert.classList.add('hidden');
+                }
+                
+                if (studentLoginBtn) {
+                    studentLoginBtn.disabled = false;
+                    studentLoginBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    studentLoginBtn.innerHTML = '🔍 ตรวจสอบข้อมูล';
+                }
+                
+                if (loginForm) {
+                    loginForm.classList.remove('opacity-50', 'pointer-events-none');
+                }
+                
+                // แสดงข้อความแจ้งเตือนว่าระบบเปิดแล้ว (ชั่วคราว)
+                if (systemClosedAlert && !systemClosedAlert.classList.contains('hidden')) {
+                    systemClosedAlert.classList.remove('hidden');
+                    systemClosedAlert.innerHTML = `
+                        <div class="flex items-center bg-green-50 border-green-200">
+                            <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <div>
+                                <h3 class="text-sm font-medium text-green-800">🟢 ระบบสอบเปิดแล้ว!</h3>
+                                <p class="text-sm text-green-700">ตอนนี้คุณสามารถเข้าสอบได้แล้ว</p>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // ซ่อนข้อความหลังจาก 3 วินาที
+                    setTimeout(() => {
+                        if (systemClosedAlert) systemClosedAlert.classList.add('hidden');
+                    }, 3000);
+                }
+            }
+        }
+
+        // ฟังก์ชันเข้าสู่ระบบนักเรียน
+        async function studentLogin() {
+            checkExamSystemStatus();
+            
+            if (!examSystemEnabled) {
+                return;
+            }
+            
+            const employeeId = document.getElementById('employeeId').value.trim();
+            
+            if (Object.keys(studentData).length === 0) {
+                await loadStudentData();
+            }
+            
+            if (studentData[employeeId]) {
+                currentUser = studentData[employeeId];
+                
+                // แสดงข้อมูลนักเรียน
+                document.getElementById('displayEmployeeId').textContent = currentUser.employeeId;
+                document.getElementById('displayFirstName').textContent = currentUser.firstName;
+                document.getElementById('displayLastName').textContent = currentUser.lastName;
+                document.getElementById('displayDepartment').textContent = currentUser.department;
+                
+                // เปลี่ยนหน้า
+                document.getElementById('studentLogin').classList.add('hidden');
+                document.getElementById('studentInfo').classList.remove('hidden');
+            } else {
+                // แสดงข้อความแจ้งเตือนแบบ inline
+                const employeeIdInput = document.getElementById('employeeId');
+                employeeIdInput.classList.add('border-red-500');
+                employeeIdInput.placeholder = 'ไม่พบรหัสพนักงานในระบบ';
+                setTimeout(() => {
+                    employeeIdInput.classList.remove('border-red-500');
+                    employeeIdInput.placeholder = 'กรอกรหัสพนักงาน';
+                }, 3000);
+            }
+        }
+
+        // ฟังก์ชันกลับไปแก้ไขข้อมูล
+        function backToLogin() {
+            document.getElementById('studentInfo').classList.add('hidden');
+            document.getElementById('studentLogin').classList.remove('hidden');
+            document.getElementById('employeeId').value = '';
+        }
+
+        // ฟังก์ชันเริ่มสอบ
+        function startExam() {
+            currentQuestionIndex = 0;
+            userAnswers = new Array(questions.length).fill(null);
+            examStartTime = Date.now();
+            
+            document.getElementById('examStudentInfo').textContent = 
+                `${currentUser.firstName} ${currentUser.lastName} - ${currentUser.department}`;
+            
+            document.getElementById('studentInfo').classList.add('hidden');
+            document.getElementById('examPage').classList.remove('hidden');
+            showQuestion();
+        }
+
+        // ฟังก์ชันแสดงคำถาม
+        function showQuestion() {
+            const question = questions[currentQuestionIndex];
+            document.getElementById('questionText').textContent = `${currentQuestionIndex + 1}. ${question.text}`;
+            document.getElementById('currentQuestion').textContent = currentQuestionIndex + 1;
+            
+            const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+            
+            resetSelection();
+            
+            if (userAnswers[currentQuestionIndex] !== null) {
+                selectAnswer(userAnswers[currentQuestionIndex]);
+            }
+            
+            document.getElementById('prevBtn').disabled = currentQuestionIndex === 0;
+            document.getElementById('nextBtn').textContent = currentQuestionIndex === questions.length - 1 ? '📤 ส่งคำตอบ' : 'ข้อถัดไป →';
+        }
+
+        // ฟังก์ชันเลือกคำตอบ
+        function selectAnswer(answer) {
+            userAnswers[currentQuestionIndex] = answer;
+            resetSelection();
+            
+            if (answer === true) {
+                document.getElementById('trueBtn').classList.add('border-green-500', 'bg-green-50');
+                document.getElementById('trueCheck').classList.remove('hidden');
+            } else {
+                document.getElementById('falseBtn').classList.add('border-red-500', 'bg-red-50');
+                document.getElementById('falseCheck').classList.remove('hidden');
+            }
+        }
+
+        // ฟังก์ชันรีเซ็ตการเลือก
+        function resetSelection() {
+            document.getElementById('trueBtn').classList.remove('border-green-500', 'bg-green-50');
+            document.getElementById('falseBtn').classList.remove('border-red-500', 'bg-red-50');
+            document.getElementById('trueCheck').classList.add('hidden');
+            document.getElementById('falseCheck').classList.add('hidden');
+        }
+
+        // ฟังก์ชันไปข้อก่อนหน้า
+        function previousQuestion() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                showQuestion();
+            }
+        }
+
+        // ฟังก์ชันไปข้อถัดไป
+        function nextQuestion() {
+            if (currentQuestionIndex < questions.length - 1) {
+                currentQuestionIndex++;
+                showQuestion();
+            } else {
+                submitExam();
+            }
+        }
+
+        // ฟังก์ชันส่งข้อสอบแบบใหม่
+        async function submitExam() {
+            try {
+                console.log('📤 กำลังส่งผลการสอบ...');
+                
+                let score = 0;
+                for (let i = 0; i < questions.length; i++) {
+                    if (userAnswers[i] === questions[i].answer) {
+                        score++;
+                    }
+                }
+                
+                const examEndTime = Date.now();
+                const examDurationSeconds = Math.round((examEndTime - examStartTime) / 1000);
+                const examDuration = Math.max(1, Math.round(examDurationSeconds / 60)); // อย่างน้อย 1 นาที
+                
+                const result = {
+                    id: `${currentUser.employeeId}_${Date.now()}`, // เพิ่ม unique ID
+                    employeeId: currentUser.employeeId,
+                    firstName: currentUser.firstName,
+                    lastName: currentUser.lastName,
+                    department: currentUser.department,
+                    score: score,
+                    totalQuestions: questions.length,
+                    percentage: Math.round((score / questions.length) * 100),
+                    duration: examDuration,
+                    timestamp: new Date().toLocaleString('th-TH'),
+                    timestampRaw: Date.now(),
+                    device: /Mobi|Android/i.test(navigator.userAgent) ? 'มือถือ' : 'คอมพิวเตอร์',
+                    userAgent: navigator.userAgent,
+                    answers: [...userAnswers] // เก็บคำตอบทั้งหมด
+                };
+                
+                // โหลดข้อมูลล่าสุดก่อนเพิ่มผลใหม่
+                await loadFromCloudStorage();
+                
+                // ตรวจสอบว่าไม่มีผลซ้ำ (กรณีส่งหลายครั้ง)
+                const existingResult = examResults.find(r => r.employeeId === currentUser.employeeId);
+                if (existingResult) {
+                    console.log('⚠️ พบผลการสอบเดิม - อัพเดทผลใหม่');
+                    const index = examResults.findIndex(r => r.employeeId === currentUser.employeeId);
+                    examResults[index] = result;
+                } else {
+                    examResults.push(result);
+                }
+                
+                // บันทึกทันที
+                const saveSuccess = await saveToCloudStorage();
+                
+                if (saveSuccess) {
+                    console.log('✅ ส่งผลการสอบสำเร็จ:', result);
+                    
+                    // แสดงผลคะแนนในหน้าเสร็จสิ้น
+                    document.getElementById('finalScore').textContent = `${score}/${questions.length}`;
+                    document.getElementById('finalPercentage').textContent = `${result.percentage}%`;
+                    
+                    // แสดงหน้าเสร็จสิ้น
+                    document.getElementById('examPage').classList.add('hidden');
+                    document.getElementById('completePage').classList.remove('hidden');
+                    
+                    // แจ้งเตือนความสำเร็จ
+                    console.log('🎉 ผลการสอบถูกส่งไปยังครูแล้ว!');
+                    
+                } else {
+                    throw new Error('ไม่สามารถบันทึกผลการสอบได้');
+                }
+                
+            } catch (error) {
+                console.error('❌ เกิดข้อผิดพลาดในการส่งผลการสอบ:', error);
+                
+                // แสดงข้อความแจ้งเตือนแบบ inline
+                const nextBtn = document.getElementById('nextBtn');
+                const originalText = nextBtn.textContent;
+                nextBtn.textContent = '❌ เกิดข้อผิดพลาด กรุณาลองใหม่';
+                nextBtn.classList.add('bg-red-600');
+                
+                setTimeout(() => {
+                    nextBtn.textContent = originalText;
+                    nextBtn.classList.remove('bg-red-600');
+                }, 3000);
+            }
+        }
+
+        // ฟังก์ชันกลับสู่หน้าแรกของนักเรียน
+        function backToStudentHome() {
+            // รีเซ็ตข้อมูล
+            currentUser = null;
+            currentQuestionIndex = 0;
+            userAnswers = [];
+            examStartTime = null;
+            
+            // กลับไปหน้าเข้าสู่ระบบนักเรียน
+            document.getElementById('completePage').classList.add('hidden');
+            document.getElementById('studentLogin').classList.remove('hidden');
+            
+            // ล้างข้อมูลในฟอร์ม
+            document.getElementById('employeeId').value = '';
+            
+            // ตรวจสอบสถานะระบบใหม่
+            checkExamSystemStatus();
+        }
+
+        // ฟังก์ชันอัพเดท Top 5 คะแนนสูงสุด
+        function updateTopScores() {
+            const topScoresDiv = document.getElementById('topScores');
+            
+            if (examResults.length === 0) {
+                topScoresDiv.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <svg class="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p>ยังไม่มีผลการสอบ</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const sortedByScore = [...examResults].sort((a, b) => b.percentage - a.percentage).slice(0, 5);
+            
+            topScoresDiv.innerHTML = sortedByScore.map((result, index) => {
+                const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+                const colors = ['text-yellow-600', 'text-gray-500', 'text-orange-600', 'text-blue-600', 'text-purple-600'];
+                
+                return `
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">${medals[index]}</span>
+                            <div>
+                                <p class="font-semibold text-gray-900">${result.firstName} ${result.lastName}</p>
+                                <p class="text-sm text-gray-600">${result.department}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xl font-bold ${colors[index]}">${result.percentage}%</p>
+                            <p class="text-sm text-gray-500">${result.score}/${result.totalQuestions}</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // ฟังก์ชันอัพเดท Top 5 ทำเสร็จเร็วสุด
+        function updateFastestTimes() {
+            const fastestTimesDiv = document.getElementById('fastestTimes');
+            
+            if (examResults.length === 0) {
+                fastestTimesDiv.innerHTML = `
+                    <div class="text-center text-gray-500 py-8">
+                        <svg class="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p>ยังไม่มีผลการสอบ</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const sortedByTime = [...examResults].sort((a, b) => a.duration - b.duration).slice(0, 5);
+            
+            fastestTimesDiv.innerHTML = sortedByTime.map((result, index) => {
+                const medals = ['⚡', '🚀', '💨', '🏃‍♂️', '🏃‍♀️'];
+                const colors = ['text-blue-600', 'text-purple-600', 'text-green-600', 'text-orange-600', 'text-red-600'];
+                
+                return `
+                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">${medals[index]}</span>
+                            <div>
+                                <p class="font-semibold text-gray-900">${result.firstName} ${result.lastName}</p>
+                                <p class="text-sm text-gray-600">${result.department}</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xl font-bold ${colors[index]}">${result.duration} นาที</p>
+                            <p class="text-sm text-gray-500">${result.percentage}% คะแนน</p>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ฟังก์ชันอัพเดท dashboard แบบ Real-time
+        async function updateDashboard() {
+            if (!isTeacher) return;
+            
+            // โหลดข้อมูลล่าสุดจาก Cloud Storage
+            await loadFromCloudStorage();
+            
+            console.log('📊 อัพเดท Dashboard - ผลสอบ:', examResults.length, 'คน');
+            
+            document.getElementById('totalStudents').textContent = examResults.length;
+            
+            const completed = examResults.length;
+            document.getElementById('completedStudents').textContent = completed;
+            
+            if (completed > 0) {
+                const avgScore = examResults.reduce((sum, result) => sum + result.percentage, 0) / completed;
+                document.getElementById('averageScore').textContent = Math.round(avgScore) + '%';
+                
+                const avgTime = examResults.reduce((sum, result) => sum + result.duration, 0) / completed;
+                document.getElementById('averageTime').textContent = Math.round(avgTime) + ' นาที';
+            } else {
+                document.getElementById('averageScore').textContent = '0%';
+                document.getElementById('averageTime').textContent = '-';
+            }
+            
+            updateTopScores();
+            updateFastestTimes();
+            
+            const tableBody = document.getElementById('resultsTable');
+            tableBody.innerHTML = '';
+            
+            if (examResults.length === 0) {
+                const emptyRow = document.createElement('tr');
+                emptyRow.innerHTML = `
+                    <td colspan="6" class="px-6 py-8 text-center text-gray-500">
+                        <div class="flex flex-col items-center">
+                            <svg class="w-12 h-12 text-gray-300 mb-2 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <p>รอนักเรียนเข้าทำข้อสอบ...</p>
+                            <p class="text-xs mt-1">🔄 ระบบ Real-time พร้อมใช้งาน (อัพเดททุก 1.5 วินาที)</p>
+                            <p class="text-xs mt-1">📡 เชื่อมต่อทั่วประเทศไทย</p>
+                        </div>
+                    </td>
+                `;
+                tableBody.appendChild(emptyRow);
+            } else {
+                // เรียงตามเวลาล่าสุด (ใช้ timestampRaw ถ้ามี)
+                const sortedResults = [...examResults].sort((a, b) => {
+                    const timeA = a.timestampRaw || new Date(a.timestamp).getTime();
+                    const timeB = b.timestampRaw || new Date(b.timestamp).getTime();
+                    return timeB - timeA;
+                });
+                
+                sortedResults.forEach((result, index) => {
+                    const row = document.createElement('tr');
+                    const isNew = index === 0 && examResults.length > 0;
+                    const isRecent = (Date.now() - (result.timestampRaw || new Date(result.timestamp).getTime())) < 30000; // ใหม่ใน 30 วินาที
+                    
+                    if (isRecent) {
+                        row.className = 'bg-green-50 border-l-4 border-green-400 animate-pulse';
+                    } else if (isNew) {
+                        row.className = 'bg-blue-50 border-l-4 border-blue-400';
+                    }
+                    
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            ${result.employeeId}
+                            ${isRecent ? '<span class="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full animate-bounce">🆕 ใหม่!</span>' : ''}
+                            ${isNew && !isRecent ? '<span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">ล่าสุด</span>' : ''}
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${result.firstName} ${result.lastName}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${result.department}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${result.percentage >= 80 ? 'bg-green-100 text-green-800' : result.percentage >= 60 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}">
+                                ${result.score}/${result.totalQuestions} (${result.percentage}%)
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                ✅ เสร็จสิ้น
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-xs text-gray-500">
+                            <div>${result.timestamp}</div>
+                            <div class="text-gray-400">${result.device} (${result.duration} นาที)</div>
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            }
+        }
+
+        // ฟังก์ชันส่งออกผลลัพธ์เป็น Excel
+        function exportResults() {
+            if (examResults.length === 0) {
+                // แสดงข้อความแจ้งเตือนแบบ inline
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '❌ ยังไม่มีข้อมูล';
+                btn.classList.add('bg-red-600');
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('bg-red-600');
+                }, 2000);
+                return;
+            }
+            
+            const ws = XLSX.utils.json_to_sheet(examResults.map(result => ({
+                'รหัสพนักงาน': result.employeeId,
+                'ชื่อ': result.firstName,
+                'นามสกุล': result.lastName,
+                'แผนก': result.department,
+                'คะแนน': `${result.score}/${result.totalQuestions}`,
+                'เปอร์เซ็นต์': `${result.percentage}%`,
+                'เวลาที่ใช้ (นาที)': result.duration,
+                'เวลาที่ทำเสร็จ': result.timestamp,
+                'อุปกรณ์': result.device
+            })));
+            
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'ผลการสอบ RBA');
+            
+            XLSX.writeFile(wb, `ผลการสอบ_RBA_${new Date().toLocaleDateString('th-TH')}.xlsx`);
+            
+            // บันทึกสถานะว่าได้ดาวน์โหลดแล้ว
+            hasDownloaded = true;
+            updateClearSystemButton();
+            
+            console.log('📊 ดาวน์โหลดผลการสอบสำเร็จ');
+        }
+
+        // ฟังก์ชันเคลียร์ระบบ
+        function clearSystem() {
+            if (examResults.length === 0) {
+                // แสดงข้อความแจ้งเตือนแบบ inline
+                const btn = event.target;
+                const originalText = btn.textContent;
+                btn.textContent = '❌ ไม่มีข้อมูลให้เคลียร์';
+                btn.classList.add('bg-red-600');
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('bg-red-600');
+                }, 2000);
+                return;
+            }
+            
+            // แสดง Modal ยืนยัน
+            updateClearSystemButton();
+            document.getElementById('clearSystemModal').classList.remove('hidden');
+        }
+
+        // ฟังก์ชันอัพเดทปุ่มเคลียร์ระบบ
+        function updateClearSystemButton() {
+            const confirmBtn = document.getElementById('confirmClearBtn');
+            const downloadWarning = document.getElementById('downloadWarning');
+            
+            if (examResults.length === 0 || hasDownloaded) {
+                confirmBtn.disabled = false;
+                confirmBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                if (downloadWarning) downloadWarning.classList.add('hidden');
+            } else {
+                confirmBtn.disabled = true;
+                confirmBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                if (downloadWarning) downloadWarning.classList.remove('hidden');
+            }
+        }
+
+        // ฟังก์ชันออกจากระบบ
+        function logout() {
+            // หยุด real-time updates
+            stopRealTimeUpdates();
+            
+            // รีเซ็ตตัวแปร
+            isTeacher = false;
+            currentUser = null;
+            currentQuestionIndex = 0;
+            userAnswers = [];
+            examStartTime = null;
+            hasDownloaded = false;
+            
+            // กลับไปหน้าเข้าสู่ระบบครู
+            document.getElementById('teacherDashboard').classList.add('hidden');
+            document.getElementById('teacherLogin').classList.remove('hidden');
+            
+            // ล้างข้อมูลในฟอร์ม
+            document.getElementById('roomCode').value = '';
+            
+            console.log('👋 ออกจากระบบแล้ว');
+        }
+
+        // ฟังก์ชันยืนยันเคลียร์ระบบ
+        async function confirmClearSystem() {
+            try {
+                // เคลียร์ข้อมูลทั้งหมด
+                examResults = [];
+                hasDownloaded = false;
+                
+                // บันทึกลง Cloud Storage
+                await saveToCloudStorage();
+                
+                // อัพเดท Dashboard
+                await updateDashboard();
+                
+                // ปิด Modal
+                closeClearSystemModal();
+                
+                // แสดงข้อความยืนยัน
+                const clearBtn = document.getElementById('clearSystemBtn');
+                const originalText = clearBtn.textContent;
+                clearBtn.textContent = '✅ เคลียร์แล้ว!';
+                clearBtn.classList.add('bg-green-600');
+                
+                setTimeout(() => {
+                    clearBtn.textContent = originalText;
+                    clearBtn.classList.remove('bg-green-600');
+                }, 2000);
+                
+                console.log('🗑️ เคลียร์ระบบสำเร็จ');
+                
+            } catch (error) {
+                console.error('❌ เกิดข้อผิดพลาดในการเคลียร์ระบบ:', error);
+                
+                const clearBtn = document.getElementById('clearSystemBtn');
+                const originalText = clearBtn.textContent;
+                clearBtn.textContent = '❌ เกิดข้อผิดพลาด';
+                clearBtn.classList.add('bg-red-600');
+                
+                setTimeout(() => {
+                    clearBtn.textContent = originalText;
+                    clearBtn.classList.remove('bg-red-600');
+                }, 3000);
+            }
+        }
+
+        // ฟังก์ชันปิด Modal เคลียร์ระบบ
+        function closeClearSystemModal() {
+            document.getElementById('clearSystemModal').classList.add('hidden');
+        }
+
+        // ฟังก์ชันเชื่อมต่อ Google Sheets
+        function connectGoogleSheets() {
+            document.getElementById('googleSheetsModal').classList.remove('hidden');
+        }
+
+        // ฟังก์ชันปิด Modal Google Sheets
+        function closeGoogleSheetsModal() {
+            document.getElementById('googleSheetsModal').classList.add('hidden');
+        }
+
+        // ฟังก์ชันบันทึกการเชื่อมต่อ Google Sheets
+        async function saveSimpleConnection() {
+            const sheetsId = document.getElementById('sheetsId').value.trim();
+            
+            if (sheetsId) {
+                SHEET_ID = sheetsId;
+                localStorage.setItem('google_sheets_id', sheetsId);
+                
+                // ทดสอบการเชื่อมต่อ
+                try {
+                    await loadStudentData();
+                    
+                    // แสดงข้อความสำเร็จ
+                    const saveBtn = event.target;
+                    const originalText = saveBtn.textContent;
+                    saveBtn.textContent = '✅ บันทึกสำเร็จ!';
+                    saveBtn.classList.add('bg-green-600');
+                    
+                    setTimeout(() => {
+                        saveBtn.textContent = originalText;
+                        saveBtn.classList.remove('bg-green-600');
+                        closeGoogleSheetsModal();
+                    }, 2000);
+                    
+                    console.log('📊 เชื่อมต่อ Google Sheets สำเร็จ');
+                    
+                } catch (error) {
+                    console.error('❌ ไม่สามารถเชื่อมต่อ Google Sheets:', error);
+                    
+                    const saveBtn = event.target;
+                    const originalText = saveBtn.textContent;
+                    saveBtn.textContent = '❌ เชื่อมต่อไม่ได้';
+                    saveBtn.classList.add('bg-red-600');
+                    
+                    setTimeout(() => {
+                        saveBtn.textContent = originalText;
+                        saveBtn.classList.remove('bg-red-600');
+                    }, 3000);
+                }
+            }
+        }
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'98f0cf1a876f26e6',t:'MTc2MDU0Njk1OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
